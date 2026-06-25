@@ -21,7 +21,7 @@ api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 
 if api_key:
     genai.configure(api_key=api_key)
-    # Gemini 2.5 Flash configured [1]
+    # Gemini 2.5 Flash setup
     model = genai.GenerativeModel('gemini-2.5-flash')
 else:
     st.warning("⚠️ API Key not detected. Please set GEMINI_API_KEY in Streamlit Secrets.")
@@ -379,7 +379,7 @@ def generate_presentations_advanced(ai_data, master_templates):
 # 5. STREAMLIT WEB FRONTEND (UI)
 # ==========================================
 st.title("🎓 Smart Academic Presentation Generator (Visuals Active)")
-st.write("Convert your academic documents into highly structured, dynamic presentations. Focuses on **Tables, Process Flowcharts, and Comparisons** automatically [1]!")
+st.write("Convert your academic documents into highly structured, dynamic presentations. Focuses on **Tables, Process Flowcharts, and Comparisons** automatically!")
 
 uploaded_file = st.file_uploader("Upload your rough Document (.docx or .pptx)", type=["docx", "pptx"])
 template_uploads = st.file_uploader("Upload 1 or more Master PPTX Templates (Optional)", type=["pptx"], accept_multiple_files=True)
@@ -420,4 +420,20 @@ if st.button("Generate Visual Presentations", type="primary"):
                 
                 # 4. Create ZIP for easy download
                 zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zi
+                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                    for filename, file_data in generated_ppts.items():
+                        zip_file.writestr(filename, file_data)
+                
+                zip_buffer.seek(0)
+                
+                st.success("🎉 Advanced Visual presentations generated successfully!")
+                
+                st.download_button(
+                    label="📥 Download Generated Presentations (ZIP)",
+                    data=zip_buffer,
+                    file_name="academic_visual_presentations.zip",
+                    mime="application/zip"
+                )
+                
+            except Exception as e:
+                st.error(f"Error occurred: {str(e)}")
