@@ -21,7 +21,7 @@ api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 
 if api_key:
     genai.configure(api_key=api_key)
-    # Using stable Gemini 2.5 Flash as standard [1]
+    # Gemini 2.5 Flash configured [1]
     model = genai.GenerativeModel('gemini-2.5-flash')
 else:
     st.warning("⚠️ API Key not detected. Please set GEMINI_API_KEY in Streamlit Secrets.")
@@ -98,6 +98,55 @@ def ai_process_word_advanced(full_text):
     clean_json = response.text.strip().replace('```json', '').replace('```', '')
     return json.loads(clean_json)
 
+def ai_process_ppt_advanced(slide_texts):
+    """BATCH PROCESSING: Packages all rough slides to process in exactly 1 single API Call to avoid 429 Quota limits"""
+    packaged_text = ""
+    for idx, text in enumerate(slide_texts):
+        packaged_text += f"\n--- ROUGH SLIDE {idx+1} ---\n{text}\n"
+        
+    prompt = f"""
+    You are an expert Academic Presentation Assistant. I will provide you with the content of a rough presentation, separated slide-by-slide.
+    Do NOT change the slide order, and keep the exact same number of slides ({len(slide_texts)} slides).
+    
+    For EACH rough slide, decide the best visual layout_type ('process', 'table', 'comparison', or 'bullets') and structure the content accordingly.
+    Also, write a formal 1-minute presenter script for each slide to go in the Speaker Notes.
+    
+    Return ONLY a valid JSON object in this format (strictly no markdown formatting outside the JSON, no extra text):
+    {{
+        "category": "lecture",
+        "slides": [
+            {{
+                "title": "Slide Title",
+                "layout_type": "bullets | table | process | comparison",
+                "content": {{
+                    "bullets": ["Point 1", "Point 2"],
+                    "table": {{
+                        "headers": ["Parameter", "Detail A", "Detail B"],
+                        "rows": [["Row 1 Col 1", "Row 1 Col 2", "Row 1 Col 3"]]
+                    }},
+                    "process": [
+                        {{"step": "1", "title": "Phase 1", "desc": "Phase 1 summary"}},
+                        {{"step": "2", "title": "Phase 2", "desc": "Phase 2 summary"}}
+                    ],
+                    "comparison": {{
+                        "left_title": "Pros / Side A",
+                        "left_content": ["Point A1", "Point A2"],
+                        "right_title": "Cons / Side B",
+                        "right_content": ["Point B1", "Point B2"]
+                    }}
+                }},
+                "script": "A detailed 1-minute presenter speech explaining the slide..."
+            }}
+        ]
+    }}
+
+    Rough Slides Data:
+    {packaged_text}
+    """
+    response = model.generate_content(prompt)
+    clean_json = response.text.strip().replace('```json', '').replace('```', '')
+    return json.loads(clean_json)
+
 # ==========================================
 # 4. POWERPOINT VISUAL GENERATION
 # ==========================================
@@ -114,7 +163,6 @@ def draw_visuals_on_slide(slide, slide_data):
     # Clean unused placeholder textboxes if present to avoid overlap
     for shape in list(slide.shapes):
         if shape.is_placeholder and shape.placeholder_format.idx == 1:
-            # We remove default content boxes on visual layouts to draw custom shapes
             if layout_type in ["process", "table", "comparison"]:
                 sp = shape._element
                 sp.getparent().remove(sp)
@@ -282,7 +330,6 @@ def draw_visuals_on_slide(slide, slide_data):
 
     # FALLBACK / LAYOUT 4: STANDARD BULLET POINTS
     else:
-        # Fallback to simple bullet insertion using standard placeholder
         bullets = content.get("bullets", ["No text details provided."])
         try:
             body_shape = slide.placeholders[1]
@@ -292,7 +339,6 @@ def draw_visuals_on_slide(slide, slide_data):
                 p = text_frame.add_paragraph()
                 p.text = bullet
         except Exception:
-            # If default placeholders are missing, draw custom list box
             txBox = slide.shapes.add_textbox(Inches(1.5), Inches(2.2), Inches(10.33), Inches(4.0))
             tf = txBox.text_frame
             tf.word_wrap = True
@@ -307,27 +353,21 @@ def generate_presentations_advanced(ai_data, master_templates):
     output_files = {}
     
     for i, (temp_name, temp_bytes) in enumerate(master_templates):
-        # Read PPTX from bytes
         prs = Presentation(io.BytesIO(temp_bytes))
-        # Ensure slide dimensions are set to widescreen (16:9)
         prs.slide_width = Inches(13.333)
         prs.slide_height = Inches(7.5)
         
         slides_data = ai_data['slides']
         
         for slide_idx, slide_content in enumerate(slides_data):
-            # Using layout index 1 (Title and Content) or blank layouts
             slide_layout = prs.slide_layouts[1]
             new_slide = prs.slides.add_slide(slide_layout)
             
-            # Draw table, flowchart, comparison boxes dynamically!
             draw_visuals_on_slide(new_slide, slide_content)
                 
-            # Speaker Notes Injection (Scripts)
             notes_slide = new_slide.notes_slide
             notes_slide.notes_text_frame.text = slide_content.get('script', "No speech generated.")
             
-        # Save generated file in memory
         output_stream = io.BytesIO()
         prs.save(output_stream)
         output_stream.seek(0)
@@ -341,7 +381,6 @@ def generate_presentations_advanced(ai_data, master_templates):
 st.title("🎓 Smart Academic Presentation Generator (Visuals Active)")
 st.write("Convert your academic documents into highly structured, dynamic presentations. Focuses on **Tables, Process Flowcharts, and Comparisons** automatically [1]!")
 
-# File uploaders
 uploaded_file = st.file_uploader("Upload your rough Document (.docx or .pptx)", type=["docx", "pptx"])
 template_uploads = st.file_uploader("Upload 1 or more Master PPTX Templates (Optional)", type=["pptx"], accept_multiple_files=True)
 
@@ -356,14 +395,11 @@ if st.button("Generate Visual Presentations", type="primary"):
                 # 1. Read files
                 if uploaded_file.name.endswith('.docx'):
                     raw_text = read_word_file(uploaded_file)
-                    # Use the advanced academic categorizer & designer
                     ai_data = ai_process_word_advanced(raw_text)
                 else:
-                    # In rough PPT, we extract and re-structure
                     raw_slides = read_ppt_file(uploaded_file)
-                    # Convert to continuous context for AI to decide layouts dynamically
-                    full_text = " [Next Slide] ".join(raw_slides)
-                    ai_data = ai_process_word_advanced(full_text)
+                    # BATCH PROCESSING: Package all slides into 1 single call to avoid 429
+                    ai_data = ai_process_ppt_advanced(raw_slides)
                 
                 # 2. Template management
                 templates_to_use = []
@@ -371,7 +407,6 @@ if st.button("Generate Visual Presentations", type="primary"):
                     for temp in template_uploads:
                         templates_to_use.append((temp.name, temp.read()))
                 else:
-                    # Fallback default master layout in memory
                     fallback_prs = Presentation()
                     fallback_prs.slide_width = Inches(13.333)
                     fallback_prs.slide_height = Inches(7.5)
@@ -385,20 +420,4 @@ if st.button("Generate Visual Presentations", type="primary"):
                 
                 # 4. Create ZIP for easy download
                 zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                    for filename, file_data in generated_ppts.items():
-                        zip_file.writestr(filename, file_data)
-                
-                zip_buffer.seek(0)
-                
-                st.success("🎉 Advanced Visual presentations generated successfully!")
-                
-                st.download_button(
-                    label="📥 Download Generated Presentations (ZIP)",
-                    data=zip_buffer,
-                    file_name="academic_visual_presentations.zip",
-                    mime="application/zip"
-                )
-                
-            except Exception as e:
-                st.error(f"Error occurred: {str(e)}")
+                with zipfile.ZipFile(zi
