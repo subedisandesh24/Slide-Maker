@@ -15,13 +15,13 @@ import google.generativeai as genai
 # ==========================================
 # 1. PAGE SETUP & SECURITY
 # ==========================================
-st.set_page_config(page_title="Academic Platform PPT Generator", page_icon="🎓", layout="centered")
+st.set_page_config(page_title="Academic PPT Generator", page_icon="🎓", layout="centered")
 
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 
 if api_key:
     genai.configure(api_key=api_key)
-    # Stable Gemini 2.5 Flash for production [1]
+    # Gemini 2.5 Flash setup
     model = genai.GenerativeModel('gemini-2.5-flash')
 else:
     st.warning("⚠️ API Key not detected. Please set GEMINI_API_KEY in Streamlit Secrets.")
@@ -158,7 +158,7 @@ def ai_process_ppt_advanced(slide_texts):
     return json.loads(clean_json)
 
 # ==========================================
-# 4. JSON ROBUST NORMALIZER
+# 4. JSON ROBUST NORMALIZER (Rate-Limit & Error Fixer)
 # ==========================================
 def normalize_ai_data(ai_data):
     normalized = {"category": "lecture", "recommended_source": "slidesgo", "slides": []}
@@ -378,37 +378,37 @@ def draw_visuals_on_slide(slide, slide_data):
                 p.font.color.rgb = THEME_TEXT_DARK
 
 # ==========================================
-# 6. DYNAMIC TEMPLATE MATCHMAKING LOGIC
+# 6. SIMPLIFIED GENERAL TEMPLATE LOADER
 # ==========================================
-def get_5_templates_by_source(recommended_source):
-    """Checks for server folders. If not populated, falls back to a clean master style dynamically"""
-    source_folder = f"master_templates/{recommended_source.lower()}/"
+def get_5_templates_from_main():
+    """Reads directly from master_templates/ folder. Falls back to clean master if empty [1]"""
+    folder_path = "master_templates/"
     templates_to_use = []
     
-    if os.path.exists(source_folder) and len(os.listdir(source_folder)) > 0:
-        all_templates = os.listdir(source_folder)
-        selected = random.sample(all_templates, min(len(all_templates), 5))
-        for t in selected:
-            with open(os.path.join(source_folder, t), "rb") as f:
-                templates_to_use.append((t, f.read()))
-    else:
-        # Fallback Dynamic Template generation (to prevent any file-missing crashes)
+    # Check if folder exists and has files
+    if os.path.exists(folder_path):
+        # Filter out subdirectories, only keep .pptx files
+        all_files = [f for f in os.listdir(folder_path) if f.endswith('.pptx')]
+        if len(all_files) > 0:
+            selected = random.sample(all_files, min(len(all_files), 5))
+            for t in selected:
+                with open(os.path.join(folder_path, t), "rb") as f:
+                    templates_to_use.append((t, f.read()))
+                    
+    # Fallback to dynamic creation if folder has no files (Prevents crash)
+    if len(templates_to_use) == 0:
         for i in range(5):
             fallback_prs = Presentation()
             fallback_prs.slide_width = Inches(13.333)
             fallback_prs.slide_height = Inches(7.5)
-            # Custom dynamic theme coloring based on source
-            if recommended_source == "slidesgo":
-                fallback_prs.slide_layouts[1].background.fill.solid()
-                fallback_prs.slide_layouts[1].background.fill.fore_color.rgb = RGBColor(245, 248, 253)
-            elif recommended_source == "presentationgo":
-                fallback_prs.slide_layouts[1].background.fill.solid()
-                fallback_prs.slide_layouts[1].background.fill.fore_color.rgb = RGBColor(240, 245, 240)
+            # Custom soft design backgrounds
+            fallback_prs.slide_layouts[1].background.fill.solid()
+            fallback_prs.slide_layouts[1].background.fill.fore_color.rgb = RGBColor(245, 248, 253)
             
             fallback_stream = io.BytesIO()
             fallback_prs.save(fallback_stream)
             fallback_stream.seek(0)
-            templates_to_use.append((f"Fallback_{recommended_source}_{i+1}.pptx", fallback_stream.read()))
+            templates_to_use.append((f"Fallback_Design_{i+1}.pptx", fallback_stream.read()))
             
     return templates_to_use
 
@@ -442,7 +442,7 @@ def generate_presentations_advanced(ai_data, master_templates):
 # 7. STREAMLIT WEB FRONTEND (UI)
 # ==========================================
 st.title("🎓 Smart Academic Presentation Generator (Visuals Active)")
-st.write("Convert your academic documents into highly structured, dynamic presentations. Automatically maps to the best platform templates [2]!")
+st.write("Convert your academic documents into highly structured, dynamic presentations. Automatically selects 5 dynamic designs!")
 
 uploaded_file = st.file_uploader("Upload your rough Document (.docx or .pptx)", type=["docx", "pptx"])
 template_uploads = st.file_uploader("Upload custom Master PPTX Templates (Optional)", type=["pptx"], accept_multiple_files=True)
@@ -473,8 +473,8 @@ if st.button("Generate Visual Presentations", type="primary"):
                     for temp in template_uploads:
                         templates_to_use.append((temp.name, temp.read()))
                 else:
-                    # Dynamic selector pulls from respective platform folder on server!
-                    templates_to_use = get_5_templates_by_source(recommended_source)
+                    # Dynamically pulls directly from master_templates/ folder [1]
+                    templates_to_use = get_5_templates_from_main()
 
                 # 3. Generate dynamic visual slides
                 generated_ppts = generate_presentations_advanced(ai_data, templates_to_use)
@@ -487,10 +487,10 @@ if st.button("Generate Visual Presentations", type="primary"):
                 
                 zip_buffer.seek(0)
                 
-                st.success(f"🎉 Visual presentations successfully generated! AI recommends **{recommended_source.upper()}** style [2]!")
+                st.success(f"🎉 Visual presentations successfully generated! AI recommends **{recommended_source.upper()}** layout style for this content [2]!")
                 
                 st.download_button(
-                    label=f"📥 Download {recommended_source.upper()} Styles (ZIP)",
+                    label=f"📥 Download Generated Presentations (ZIP)",
                     data=zip_buffer,
                     file_name="academic_visual_presentations.zip",
                     mime="application/zip"
