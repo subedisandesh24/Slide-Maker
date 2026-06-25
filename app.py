@@ -19,7 +19,8 @@ api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 
 if api_key:
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # Model updated to gemini-2.5-flash as 1.5 versions are shut down by Google
+    model = genai.GenerativeModel('gemini-2.5-flash')
 else:
     st.warning("⚠️ API Key not detected. Please set GEMINI_API_KEY in Streamlit Secrets.")
 
