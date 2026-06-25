@@ -15,39 +15,42 @@ from pptx.oxml.ns import qn
 import google.generativeai as genai
 
 # ==========================================
-# 1. PAGE SETUP & SECURITY
+# 1. GLOBAL PREMIUM THEME COLORS (Wow Factor)
 # ==========================================
-st.set_page_config(page_title="M.Sc. Advanced Visual PPT", page_icon="🎓", layout="centered")
+COLOR_ROYAL_BLUE = RGBColor(10, 30, 80)     # Deep Royal Blue (Main Academic)
+COLOR_TEAL = RGBColor(0, 130, 140)          # Tech/Science Teal
+COLOR_EMERALD = RGBColor(40, 160, 80)       # Success/Vibrant Green
+COLOR_RUST = RGBColor(220, 100, 40)         # Alert/Warning Rust Orange
+COLOR_GOLD = RGBColor(240, 180, 40)         # Highlight Gold/Amber
+COLOR_LIGHT_GRAY = RGBColor(246, 248, 250)   # Clean Slide Background Texture [1]
+COLOR_WHITE = RGBColor(255, 255, 255)       # Solid White Cards
+COLOR_TEXT_DARK = RGBColor(40, 40, 40)      # Readable body text
+COLOR_ACCENT_GREEN = RGBColor(40, 167, 69)  # High-impact green stats
+
+# DYNAMIC CONTEXTUAL BACKGROUND COLORS [1]
+BG_TITLE = RGBColor(15, 34, 64)               # Dark Blue background for Title Slide [1]
+BG_PROBLEM = RGBColor(253, 240, 235)          # Soft Alert Orange for Problem Statement [1]
+BG_OBJECTIVE = RGBColor(235, 247, 245)        # Soft Mint Teal for Objectives [1]
+BG_METHODOLOGY = RGBColor(255, 255, 255)      # Crisp White (to contrast colorful cards) [1]
+BG_RESULTS = RGBColor(240, 244, 252)          # Pale Ice Blue for Results/Data [1]
+BG_CONCLUSION = RGBColor(235, 248, 238)       # Soft Emerald Green for Conclusions [1]
+BG_DEFAULT = RGBColor(246, 248, 250)          # Classic Light Gray
+
+# ==========================================
+# 2. PAGE SETUP & SECURITY
+# ==========================================
+st.set_page_config(page_title="M.Sc. Premium Thesis PPT Generator", page_icon="🎓", layout="centered")
 
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 
 if api_key:
     genai.configure(api_key=api_key)
-    # Gemini 2.5 Flash for high-speed, cost-free processing [1]
     model = genai.GenerativeModel('gemini-2.5-flash')
 else:
     st.warning("⚠️ API Key not detected. Please set GEMINI_API_KEY in Streamlit Secrets.")
 
-# EYE-CATCHY PREMIUM ACADEMIC THEME COLOR PALETTE
-COLOR_ROYAL_BLUE = RGBColor(15, 34, 64)       # Deep Royal Blue (Main)
-COLOR_TEAL = RGBColor(0, 130, 140)            # Tech/Science Teal
-COLOR_EMERALD = RGBColor(40, 160, 80)         # Success/Vibrant Green
-COLOR_RUST = RGBColor(220, 100, 40)           # Alert/Warning Rust Orange
-COLOR_GOLD = RGBColor(240, 180, 40)           # Highlight Gold
-COLOR_WHITE = RGBColor(255, 255, 255)
-COLOR_TEXT_DARK = RGBColor(40, 40, 40)
-
-# DYNAMIC CONTEXTUAL BACKGROUNDS (Eye-Catchy Theme) [1]
-BG_TITLE = RGBColor(15, 34, 64)               # Dark Blue background for title [1]
-BG_PROBLEM = RGBColor(253, 240, 235)          # Soft Alert Orange for problem [1]
-BG_OBJECTIVE = RGBColor(235, 247, 245)        # Soft Mint Teal for objectives [1]
-BG_METHODOLOGY = RGBColor(255, 255, 255)      # Crisp White (high contrast for colorful cards) [1]
-BG_RESULTS = RGBColor(240, 244, 252)          # Pale Ice Blue for results/charts [1]
-BG_CONCLUSION = RGBColor(235, 248, 238)       # Soft Emerald Green for conclusion [1]
-BG_DEFAULT = RGBColor(246, 248, 250)          # Classic Light Gray
-
 # ==========================================
-# 2. FILE READERS
+# 3. FILE READERS
 # ==========================================
 def read_word_file(file_obj):
     doc = docx.Document(file_obj)
@@ -62,17 +65,24 @@ def read_ppt_file(file_obj):
     return slide_texts
 
 # ==========================================
-# 3. EXTRA-VISUAL-FILTER ACADEMIC AI ENGINE
+# 4. EXTRA-VISUAL-FILTER ACADEMIC AI ENGINE
 # ==========================================
 def ai_process_word_advanced(full_text):
     prompt = f"""
-    You are an expert Academic Presentation Assistant. Your task is to filter this rough research text, discard filler details, and structure it into a highly visual, eye-catchy M.Sc. Thesis Defense presentation.
+    You are an expert Academic Presentation Assistant. Your goal is to structure this text into HIGHLY VISUAL, PREMIUM presentation slides with a 'WOW' factor.
     
-    FILTRATION & VISUAL RULES:
-    1. Filter out long explanations. Keep slide text extremely concise (strictly 3-5 words per bullet line). Follow the 6x6 rule [4].
-    2. PRIORITIZE VISUALS FIRST: Decide if content can be formatted into a 'table', 'process flowchart', or 'comparison columns'. Fallback to 'bullets' only if no visual representation is possible.
-    3. Generate a beautiful MERMAID.JS flowchart code representing the methodology workflow.
-    4. Put all detailed oral explanation scripts in the 'script' (Speaker Notes) [1].
+    STRICT TEXT LIMITS:
+    - Never write long paragraphs or sentences on slides.
+    - Each slide bullet point must be strictly restricted to 3-5 words maximum.
+    - Focus strictly on dynamic visual representation rather than plain text.
+    - Put all extensive explanations in the 'script' (Speaker Notes) so the presenter can speak for 1 minute.
+
+    Available Layout Types:
+    1. 'process': Use for workflows, methodologies, or step-by-step procedures. (Horizontal process cards with badges)
+    2. 'table': Use for comparative parameter matrix, structured comparison data.
+    3. 'comparison': Use for contrasting two concepts, Pros vs Cons, Old vs New. (Side-by-side split cards)
+    4. 'stat': Use if there's a strong numeric fact, percentage, metric, or major statistic (e.g., '95% Efficiency', '500+ Participants').
+    5. 'bullets': Use only if none of the above visual layouts match.
 
     Return ONLY a valid JSON object in this format (strictly no markdown formatting outside the JSON, no extra text):
     {{
@@ -82,9 +92,9 @@ def ai_process_word_advanced(full_text):
         "slides": [
             {{
                 "title": "Slide Title",
-                "layout_type": "title | background | problem_statement | objective | methodology | results | conclusion",
+                "layout_type": "process | table | comparison | stat | bullets",
                 "content": {{
-                    "bullets": ["Concise point 1", "Concise point 2"],
+                    "bullets": ["Keyword-focused bullet 1", "Keyword-focused bullet 2"],
                     "table": {{
                         "headers": ["Parameter", "Detail A", "Detail B"],
                         "rows": [["Row 1 Col 1", "Row 1 Col 2", "Row 1 Col 3"]]
@@ -93,17 +103,17 @@ def ai_process_word_advanced(full_text):
                         {{"step": "1", "title": "Phase 1", "desc": "Phase 1 summary"}}
                     ],
                     "comparison": {{
-                        "left_title": "Side A",
-                        "left_content": ["Short point A1"],
-                        "right_title": "Side B",
-                        "right_content": ["Short point B1"]
+                        "left_title": "Side A Title",
+                        "left_content": ["Short point A1", "Short point A2"],
+                        "right_title": "Side B Title",
+                        "right_content": ["Short point B1", "Short point B2"]
                     }},
                     "stat": {{
                         "number": "95%",
-                        "label": "Metric description"
+                        "label": "Metric Description (max 5 words)"
                     }}
                 }},
-                "script": "A detailed, professional 1-minute presenter speech..."
+                "script": "A detailed, professional 1-minute presenter speech explaining the slide content..."
             }}
         ]
     }}
@@ -122,14 +132,16 @@ def ai_process_ppt_advanced(slide_texts):
         
     prompt = f"""
     You are an expert Academic Presentation Assistant. Process this rough slide deck. Maintain 1:1 slide order ({len(slide_texts)} slides).
-    Strictly filter text and summarize it into a premium visual design with custom dynamic layouts.
+    Strictly summarize the text into a premium M.Sc. Defense visual design.
     
-    STRICT VISUAL & 6x6 RULES:
+    STRICT 6x6 RULE:
     - Maximum 6 bullet lines, maximum 6 words per line [4]. Prioritize tables and flowcharts.
-    - Put all speech explanations in the 'script' (Speaker Notes) [1].
+    - Put all speech explanations in the 'script' (Speaker Notes) so the presenter can speak for 1 minute [1].
     - Generate a beautiful MERMAID.JS flowchart code representing the methodology workflow.
 
-    Return ONLY a valid JSON object in this format:
+    For each slide, choose the most appropriate layout_type: 'title', 'background', 'problem_statement', 'objective', 'methodology', 'results', or 'conclusion'.
+    
+    Return ONLY a valid JSON object in this format (strictly no markdown formatting outside the JSON, no extra text):
     {{
         "category": "thesis",
         "recommended_source": "slidesgo | presentationgo | slidescarnival",
@@ -137,9 +149,9 @@ def ai_process_ppt_advanced(slide_texts):
         "slides": [
             {{
                 "title": "Slide Title",
-                "layout_type": "title | background | problem_statement | objective | methodology | results | conclusion",
+                "layout_type": "process | table | comparison | stat | bullets",
                 "content": {{
-                    "bullets": ["Keyword point 1"],
+                    "bullets": ["Keyword point 1", "Keyword point 2"],
                     "table": {{
                         "headers": ["Parameter", "Detail A", "Detail B"],
                         "rows": [["Row 1 Col 1", "Row 1 Col 2", "Row 1 Col 3"]]
@@ -171,7 +183,7 @@ def ai_process_ppt_advanced(slide_texts):
     return json.loads(clean_json)
 
 # ==========================================
-# 4. JSON ROBUST NORMALIZER
+# 5. JSON ROBUST NORMALIZER
 # ==========================================
 def normalize_ai_data(ai_data):
     normalized = {"category": "lecture", "recommended_source": "slidesgo", "mermaid_diagram": "graph TD\n    A[Start] --> B[Process]", "slides": []}
@@ -206,7 +218,7 @@ def normalize_ai_data(ai_data):
     return normalized
 
 # ==========================================
-# 5. PROGRAMMATIC TRANSITIONS TRIGGER (XML) [1]
+# 6. PROGRAMMATIC TRANSITION & TIMING TRIGGER (XML)
 # ==========================================
 def set_slide_transition_and_timing(slide, transition_type="fade", auto_advance_sec=60):
     sLD = slide._element
@@ -235,10 +247,19 @@ def set_slide_transition_and_timing(slide, transition_type="fade", auto_advance_
         transition.set('advTm', str(auto_advance_sec * 1000))
 
 # ==========================================
-# 6. DYNAMIC CONTEXTUAL BG DESIGN ENGINE [1]
+# 7. PREMIUM WOW-FACTOR VISUAL DRAWING ENGINE
 # ==========================================
-def apply_premium_slide_texture(slide, layout_type):
-    # Dynamic background color selection [1]
+def apply_slide_branding_texture(slide, layout_type):
+    top_bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(13.333), Inches(0.15))
+    top_bar.fill.solid()
+    top_bar.fill.fore_color.rgb = COLOR_ROYAL_BLUE if layout_type != "title" else COLOR_TEAL
+    top_bar.line.fill.background()
+
+def draw_visual_thesis_slide(slide, slide_data):
+    layout_type = slide_data.get("layout_type", "bullets")
+    content = slide_data.get("content", {})
+    
+    # Contextual background selection [1]
     bg_color = BG_DEFAULT
     if layout_type == "title": bg_color = BG_TITLE [1]
     elif layout_type == "problem_statement": bg_color = BG_PROBLEM [1]
@@ -249,19 +270,9 @@ def apply_premium_slide_texture(slide, layout_type):
 
     slide.background.fill.solid()
     slide.background.fill.fore_color.rgb = bg_color
-
-    # Slide Top Branding bar
-    top_bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(13.333), Inches(0.15))
-    top_bar.fill.solid()
-    top_bar.fill.fore_color.rgb = COLOR_ROYAL_BLUE if layout_type != "title" else COLOR_TEAL
-    top_bar.line.fill.background()
-
-def draw_visual_thesis_slide(slide, slide_data):
-    layout_type = slide_data.get("layout_type", "bullets")
-    content = slide_data.get("content", {})
     
-    # Apply Eye-catchy backgrounds dynamically [1]
-    apply_premium_slide_texture(slide, layout_type)
+    # Apply top branding bar
+    apply_slide_branding_texture(slide, layout_type)
     
     # Title Setup
     if slide.shapes.title:
@@ -279,7 +290,7 @@ def draw_visual_thesis_slide(slide, slide_data):
                 sp = shape._element
                 sp.getparent().remove(sp)
 
-    # 1. TITLE LAYOUT (Dynamic Visual Panel)
+    # LAYOUT 1: TITLE SLIDE
     if layout_type == "title":
         panel = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(-0.5), Inches(0), Inches(4.5), Inches(7.5))
         panel.fill.solid()
@@ -300,7 +311,7 @@ def draw_visual_thesis_slide(slide, slide_data):
         p_sub.font.size = Pt(18)
         p_sub.font.color.rgb = COLOR_TEAL
 
-    # 2. PROBLEM STATEMENT (Warning Rust orange card)
+    # LAYOUT 2: PROBLEM STATEMENT (Rust Orange card)
     elif layout_type == "problem_statement":
         card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(1.5), Inches(2.2), Inches(10.33), Inches(4.0))
         card.fill.solid()
@@ -330,7 +341,7 @@ def draw_visual_thesis_slide(slide, slide_data):
             p.font.color.rgb = COLOR_TEXT_DARK
             p.space_after = Pt(10)
 
-    # 3. OBJECTIVES (Vivid target checklist cards)
+    # LAYOUT 3: OBJECTIVES (Target checklist cards)
     elif layout_type == "objective":
         bullets = content.get("bullets", ["Research Objective."])
         start_y = Inches(2.2)
@@ -363,7 +374,7 @@ def draw_visual_thesis_slide(slide, slide_data):
             p_c.font.bold = True
             p_c.font.color.rgb = COLOR_TEXT_DARK
 
-    # 4. METHODOLOGY (Flowchart process cards - Multi-Color Theme)
+    # LAYOUT 4: METHODOLOGY (Flowchart process cards - Multi-Color Theme)
     elif layout_type == "methodology":
         steps = content.get("process", [])[:4]
         if not steps and "bullets" in content:
@@ -429,7 +440,7 @@ def draw_visual_thesis_slide(slide, slide_data):
                     arrow.fill.fore_color.rgb = step_color
                     arrow.line.fill.background()
 
-    # 5. RESULTS (Sleek Data Matrix table / High-Impact metrics)
+    # LAYOUT 5: RESULTS (Sleek Data Matrix table / High-Impact metrics)
     elif layout_type == "results":
         if "table" in content:
             table_data = content["table"]
@@ -501,7 +512,7 @@ def draw_visual_thesis_slide(slide, slide_data):
             p_label.font.color.rgb = COLOR_ROYAL_BLUE
             p_label.alignment = PP_ALIGN.CENTER
 
-    # 6. CONCLUSION & TAKEAWAY
+    # LAYOUT 6: CONCLUSION & TAKEAWAY (Gold theme)
     elif layout_type == "conclusion":
         bullets = content.get("bullets", ["M.Sc. Research conclusion point."])
         
@@ -548,9 +559,8 @@ def draw_visual_thesis_slide(slide, slide_data):
             p.font.color.rgb = COLOR_TEXT_DARK
             p.space_after = Pt(10)
 
-
 # ==========================================
-# 7. DYNAMIC TEMPLATE MATCHMAKING
+# 7. SIMPLIFIED DYNAMIC TEMPLATE MATCHMAKING
 # ==========================================
 def get_5_templates_from_main():
     folder_path = "master_templates/"
@@ -594,6 +604,7 @@ def generate_presentations_advanced(ai_data, master_templates):
             slide_layout = prs.slide_layouts[1]
             new_slide = prs.slides.add_slide(slide_layout)
             
+            # Draw premium M.Sc. slide visual card styling
             draw_visual_thesis_slide(new_slide, slide_content)
             
             # Programmatic Transition setup
